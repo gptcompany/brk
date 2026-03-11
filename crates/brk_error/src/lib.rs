@@ -158,14 +158,35 @@ impl Error {
     /// Lock errors are transient and should not trigger data deletion.
     #[cfg(feature = "vecdb")]
     pub fn is_lock_error(&self) -> bool {
-        matches!(self, Error::VecDB(e) if e.is_lock_error())
+        matches!(self, Error::VecDB(vecdb::Error::TryLockError(_)))
+            || matches!(self, Error::RawDB(vecdb::RawDBError::TryLock(_)))
     }
 
     /// Returns true if this error indicates data corruption or version incompatibility.
     /// These errors may require resetting/deleting the data to recover.
     #[cfg(feature = "vecdb")]
     pub fn is_data_error(&self) -> bool {
-        matches!(self, Error::VecDB(e) if e.is_data_error())
+        matches!(
+            self,
+            Error::VecDB(
+                vecdb::Error::DifferentVersion { .. }
+                    | vecdb::Error::DifferentFormat { .. }
+                    | vecdb::Error::WrongEndian
+                    | vecdb::Error::StampMismatch { .. }
+                    | vecdb::Error::CorruptedRegion { .. }
+                    | vecdb::Error::DecompressionMismatch { .. }
+                    | vecdb::Error::InvalidFormat(_)
+            )
+        ) || matches!(
+            self,
+            Error::RawDB(
+                vecdb::RawDBError::RegionMetadataUnwritten
+                    | vecdb::RawDBError::InvalidMetadataSize { .. }
+                    | vecdb::RawDBError::EmptyMetadata
+                    | vecdb::RawDBError::RegionIndexMismatch
+                    | vecdb::RawDBError::CorruptedMetadata(_)
+            )
+        )
             || matches!(self, Error::VersionMismatch { .. })
     }
 

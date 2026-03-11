@@ -40,8 +40,8 @@ aide = { version = "0.16.0-alpha.2", features = ["axum-json", "axum-query"] }
 axum = { version = "0.8.8", default-features = false, features = ["http1", "json", "query", "tokio", "tracing"] }
 bitcoin = { version = "0.32.8", features = ["serde"] }
 bitcoincore-rpc = "0.19.0"
-corepc-client = { path = "/Users/k/Developer/corepc/client", features = ["client-sync"] }
-corepc-jsonrpc = { package = "jsonrpc", path = "/Users/k/Developer/corepc/jsonrpc", features = ["simple_http"], default-features = false }
+corepc-client = { version = "0.10.0", features = ["client-sync"] }
+corepc-jsonrpc = { package = "jsonrpc", version = "0.18.0", features = ["simple_http"], default-features = false }
 brk_alloc = { version = "0.1.9", path = "crates/brk_alloc" }
 brk_bencher = { version = "0.1.9", path = "crates/brk_bencher" }
 brk_bindgen = { version = "0.1.9", path = "crates/brk_bindgen" }
@@ -87,7 +87,6 @@ tokio = { version = "1.50.0", features = ["rt-multi-thread"] }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tower-http = { version = "0.6.8", features = ["catch-panic", "compression-br", "compression-gzip", "compression-zstd", "cors", "normalize-path", "timeout", "trace"] }
 tower-layer = "0.3"
-# vecdb = { version = "0.6.8", features = ["derive", "serde_json", "pco", "schemars"] }
 vecdb = { path = "../anydb/crates/vecdb", features = ["derive", "serde_json", "pco", "schemars"] }
 
 [workspace.metadata.release]

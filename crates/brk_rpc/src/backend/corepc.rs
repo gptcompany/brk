@@ -8,7 +8,7 @@ use tracing::info;
 
 use super::{Auth, BlockHeaderInfo, BlockInfo, BlockchainInfo, RawMempoolEntry, TxOutInfo};
 
-type CoreClient = corepc_client::client_sync::v30::Client;
+type CoreClient = corepc_client::client_sync::v29::Client;
 type CoreError = corepc_client::client_sync::Error;
 
 #[derive(Debug)]
@@ -246,8 +246,10 @@ impl ClientInner {
     }
 
     pub fn get_raw_mempool_verbose(&self) -> Result<Vec<(bitcoin::Txid, RawMempoolEntry)>> {
-        let r = self.call_with_retry(|c| c.get_raw_mempool_verbose())?;
-        r.0.into_iter()
+        let r: std::collections::BTreeMap<String, VerboseMempoolEntry> = self.call_with_retry(
+            |c| c.call("getrawmempool", &[serde_json::Value::Bool(true)]),
+        )?;
+        r.into_iter()
             .map(|(txid_str, entry)| {
                 let txid = txid_str
                     .parse::<bitcoin::Txid>()
@@ -309,4 +311,22 @@ struct TxOutResponse {
 #[derive(serde::Deserialize)]
 struct TxOutScriptPubKey {
     hex: String,
+}
+
+#[derive(serde::Deserialize)]
+struct VerboseMempoolEntry {
+    vsize: i64,
+    weight: i64,
+    #[serde(rename = "ancestorcount")]
+    ancestor_count: i64,
+    #[serde(rename = "ancestorsize")]
+    ancestor_size: i64,
+    fees: VerboseMempoolFees,
+    depends: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct VerboseMempoolFees {
+    base: f64,
+    ancestor: f64,
 }

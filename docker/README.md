@@ -12,7 +12,7 @@
    ```bash
    cp docker/.env.example docker/.env
    ```
-   Edit `docker/.env` and set `BITCOIN_DATA_DIR` to your Bitcoin Core data directory.
+   Edit `docker/.env` and set `BITCOIN_DATA_DIR`, `BRK_DATA_DIR`, and RPC credentials for your node.
 
 2. **Run with Docker Compose**
    ```bash
@@ -35,10 +35,10 @@ These variables are interpolated into `docker-compose.yml` at startup:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `BITCOIN_DATA_DIR` | Path to Bitcoin Core data directory | - |
-| `BTC_RPC_HOST` | Bitcoin Core RPC host | `localhost` |
-| `BTC_RPC_USER` | Bitcoin RPC username | `bitcoin` |
-| `BTC_RPC_PASSWORD` | Bitcoin RPC password | `bitcoin` |
-| `BRK_DATA_VOLUME` | Docker volume name for BRK data | `brk-data` |
+| `BRK_DATA_DIR` | Host path for BRK data bind mount | `/media/sam/1TB/brk-data` |
+| `BTC_RPC_HOST` | Bitcoin Core RPC host | `172.29.0.1` |
+| `BTC_RPC_USER` | Bitcoin RPC username | `bitcoinrpc` |
+| `BTC_RPC_PASSWORD` | Bitcoin RPC password | - |
 
 ### Connecting to Bitcoin Core
 
@@ -49,7 +49,7 @@ Uncomment the `--rpccookiefile` lines in `docker-compose.yml` and remove `--rpcu
 Set `BTC_RPC_USER` and `BTC_RPC_PASSWORD` in your `docker/.env` file.
 
 **Network Connectivity**
-- **Same host (Bitcoin Core running natively)**: Use `host.docker.internal` on macOS/Windows or `172.17.0.1` on Linux
+- **Same host (Bitcoin Core running natively)**: use the bridge gateway declared in compose (`172.29.0.1`)
 - **Same host (Bitcoin Core in Docker)**: Use the service name or container IP
 - **Remote host**: Use the actual IP address or hostname
 
@@ -63,19 +63,15 @@ docker compose -f docker/docker-compose.yml build
 
 BRK uses [sparse files](https://en.wikipedia.org/wiki/Sparse_file). Volume inspection and `docker system df` may report the logical file size (>1 TB) instead of actual disk usage (~350 GB). Use `du -sh` on the volume mount point to see real usage.
 
-### Named Volume (Default)
-Uses a Docker-managed volume called `brk-data`.
-
-### Bind Mount
-1. Set `BRK_DATA_DIR` in `docker/.env`
-2. In `docker-compose.yml`, comment out the named volume line and uncomment the bind mount line
-3. Remove the `volumes:` section at the bottom of `docker-compose.yml`
+### Bind Mount (Default)
+Set `BRK_DATA_DIR` in `docker/.env` and make sure the directory exists and is writable by UID `1000`.
 
 ## Monitoring
 
 ```bash
 docker compose -f docker/docker-compose.yml ps
 docker compose -f docker/docker-compose.yml logs -f
+docker inspect --format='{{.State.Health.Status}}' brk
 ```
 
 ## Troubleshooting
@@ -83,7 +79,8 @@ docker compose -f docker/docker-compose.yml logs -f
 ### Cannot connect to Bitcoin Core
 1. Ensure Bitcoin Core is running with `-server=1`
 2. Check RPC credentials are correct
-3. Verify network connectivity from container
+3. Verify the container can reach `172.29.0.1:8332`
+4. If Bitcoin Core only binds RPC on `127.0.0.1`, add `rpcbind=0.0.0.0` and allow `rpcallowip=172.29.0.0/24`
 
 ### Permission denied errors
 Ensure the Bitcoin data directory is readable by the container user (UID 1000).
@@ -92,4 +89,4 @@ Ensure the Bitcoin data directory is readable by the container user (UID 1000).
 
 - Bitcoin data is mounted read-only
 - BRK runs as non-root user inside container
-- Only necessary ports are exposed
+- BRK only binds to `127.0.0.1:7070` on the host

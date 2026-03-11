@@ -5,16 +5,18 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: brk:latest
+      additional_contexts:
+        anydb: ../../anydb
+    image: brk:v0.1.9
     container_name: brk
     restart: unless-stopped
     ports:
-      - 7070:3110
+      - 127.0.0.1:7070:3110
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ${BITCOIN_DATA_DIR:-/path/to/bitcoin}:/bitcoin:ro
-      - ${BRK_DATA_VOLUME:-brk-data}:/home/brk/.brk
-      # Bind mount alternative (uncomment and set BRK_DATA_DIR in .env):
-      # - ${BRK_DATA_DIR:-./brk-data}:/home/brk/.brk
+      - ${BRK_DATA_DIR:-/media/sam/1TB/brk-data}:/home/brk/.brk
     command:
       - --bitcoindir
       - /bitcoin
@@ -36,8 +38,42 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      # Initial full-chain indexing can take many hours before /health is served.
+      start_period: 24h
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 2G
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+    labels:
+      autoheal: "true"
 
-volumes:
-  brk-data:
-    driver: local
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: brk-autoheal
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 60
+      AUTOHEAL_START_PERIOD: 86400
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  default:
+    name: brk_default
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+          gateway: 172.29.0.1
