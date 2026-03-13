@@ -36,8 +36,9 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:3110/health"]
       interval: 30s
-      timeout: 10s
-      retries: 3
+      # /health can be slow during bitcoind reconnects or heavy catch-up.
+      timeout: 45s
+      retries: 5
       # Initial full-chain indexing can take many hours before /health is served.
       start_period: 24h
     deploy:
