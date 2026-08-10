@@ -2,11 +2,11 @@
 
 use std::{fs, path::Path, thread, time::Instant};
 
-use brk_error::Result;
+use brk_error::{Error, Result};
 use brk_iterator::Blocks;
 use brk_rpc::Client;
 use brk_types::Height;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use vecdb::{Exit, ReadOnlyClone, ReadableVec, Ro, Rw, StorageMode};
 mod constants;
 mod indexes;
@@ -88,7 +88,7 @@ impl Indexer {
     }
 
     pub fn index(&mut self, blocks: &Blocks, client: &Client, exit: &Exit) -> Result<Indexes> {
-        self.index_(blocks, client, exit, false)
+        self.index_with_content_recovery(blocks, client, exit, false)
     }
 
     pub fn checked_index(
@@ -97,7 +97,26 @@ impl Indexer {
         client: &Client,
         exit: &Exit,
     ) -> Result<Indexes> {
-        self.index_(blocks, client, exit, true)
+        self.index_with_content_recovery(blocks, client, exit, true)
+    }
+
+    fn index_with_content_recovery(
+        &mut self,
+        blocks: &Blocks,
+        client: &Client,
+        exit: &Exit,
+        check_collisions: bool,
+    ) -> Result<Indexes> {
+        match self.index_(blocks, client, exit, check_collisions) {
+            Err(Error::UnknownTxid) => {
+                warn!(
+                    "Txid index content integrity check failed; resetting indexed data and rebuilding from genesis"
+                );
+                self.reset()?;
+                self.index_(blocks, client, exit, check_collisions)
+            }
+            result => result,
+        }
     }
 
     fn index_(
@@ -124,10 +143,8 @@ impl Indexer {
                     (starting_indexes, Some(hash))
                 }
                 None => {
-                    // Data inconsistency detected - reset and start fresh
                     info!("Data inconsistency detected, resetting indexer...");
-                    self.vecs.reset()?;
-                    self.stores.reset()?;
+                    self.reset()?;
                     (Indexes::default(), None)
                 }
             }
@@ -258,5 +275,12 @@ impl Indexer {
         self.vecs.compact()?;
 
         Ok(starting_indexes)
+    }
+
+    fn reset(&mut self) -> Result<()> {
+        info!("Resetting indexed vecs and stores...");
+        self.vecs.reset()?;
+        self.stores.reset()?;
+        Ok(())
     }
 }
